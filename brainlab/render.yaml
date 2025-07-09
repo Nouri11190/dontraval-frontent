@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: dontraval-api
+    env: python
+    buildCommand: ""
+    startCommand: "python app.py"
+    plan: free
+    region: frankfurt
+    branch: main
+    runtime: python
+    repo: https://github.com/Nouri11190/dontraval-backend.git
+    autoDeploy: true
