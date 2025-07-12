@@ -1,12 +1,15 @@
 services:
   - type: web
-    name: dontraval-api
+    name: dontraval-app
     env: python
-    buildCommand: ""
-    startCommand: "python app.py"
+    region: oregon
     plan: free
-    region: frankfurt
+
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+
     branch: main
-    runtime: python
-    repo: https://github.com/Nouri11190/dontraval-backend.git
-    autoDeploy: true
+    repo: https://github.com/Nouri11190/dontraval-frontent
+
+    domains:
+      - dontraval.it.com
