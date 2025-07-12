@@ -1,15 +1,8 @@
 services:
   - type: web
-    name: dontraval-app
-    runtime: python
-    region: oregon
-    plan: free
-
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app"
-
-    branch: main
-    repo: https://github.com/Nouri11190/dontraval-frontent
-
-    domains:
-      - dontraval.it.com
+    name: dontraval-frontent
+    env: python
+    startCommand: "gunicorn app:app --bind 0.0.0.0:10000"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
