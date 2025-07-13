@@ -1,74 +1,72 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import (
+    Flask, render_template, request, jsonify, send_from_directory
+)
+from flask_jwt_extended import (
+    JWTManager, jwt_required, create_access_token, get_jwt_identity
+)
 import os
-from werkzeug.utils import secure_filename
+from auth import register_user, login_user
 
 app = Flask(__name__)
-app.secret_key = 'supersecretkey'
+app.config['SECRET_KEY']      = 'your-secret-key'
+app.config['JWT_SECRET_KEY']  = 'your-jwt-secret'
+app.config['UPLOAD_FOLDER']   = 'uploads'
 
-UPLOAD_FOLDER = 'uploads'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# create uploads folder if missing
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Dummy user store
-users = {}
+jwt = JWTManager(app)
 
+# ---------- Public ----------
 @app.route('/')
 def index():
-    if 'username' in session:
-        return redirect(url_for('dashboard'))
-    return render_template('login.html')
+    return render_template('index.html')
 
-@app.route('/register', methods=['GET', 'POST'])
+# ---------- Auth ----------
+@app.route('/register', methods=['POST'])
 def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        if username in users:
-            flash('Username already exists!', 'danger')
-            return redirect(url_for('register'))
-        users[username] = password
-        flash('Registered successfully!', 'success')
-        return redirect(url_for('login'))
-    return render_template('register.html')
+    data = request.get_json()
+    return register_user(data['email'], data['password'])
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['POST'])
 def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        if users.get(username) == password:
-            session['username'] = username
-            return redirect(url_for('dashboard'))
-        flash('Invalid credentials', 'danger')
-    return render_template('login.html')
+    data = request.get_json()
+    return login_user(data['email'], data['password'])
 
-@app.route('/logout')
-def logout():
-    session.pop('username', None)
-    flash('Logged out successfully', 'info')
-    return redirect(url_for('login'))
-
-@app.route('/dashboard')
-def dashboard():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    return render_template('dashboard.html', username=session['username'])
-
+# ---------- Upload ----------
 @app.route('/upload', methods=['POST'])
+@jwt_required()
 def upload():
-    if 'username' not in session:
-        return jsonify({'error': 'Unauthorized'}), 401
-    if 'config_file' not in request.files:
-        return jsonify({'error': 'No file uploaded'}), 400
-    file = request.files['config_file']
+    if 'file' not in request.files:
+        return jsonify({'message': 'No file part'}), 400
+
+    file = request.files['file']
     if file.filename == '':
-        return jsonify({'error': 'Empty filename'}), 400
-    filename = secure_filename(file.filename)
-    path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(path)
-    with open(path) as f:
-        data = f.read()
-    return jsonify({'message': 'File uploaded successfully', 'data': data})
+        return jsonify({'message': 'No selected file'}), 400
+
+    save_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+    file.save(save_path)
+    return jsonify({'message': 'Upload successful'}), 201
+
+# ---------- Dashboard API ----------
+@app.route('/api/dashboard-data')
+@jwt_required()
+def dashboard_data():
+    user  = get_jwt_identity()
+    files = os.listdir(app.config['UPLOAD_FOLDER'])
+    return jsonify({'user': user, 'files': files})
+
+# ---------- Serve uploaded files (optional) ----------
+@app.route('/uploads/<path:fname>')
+@jwt_required()
+def get_file(fname):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], fname)
+
+# ---------- Dashboard page ----------
+@app.route('/dashboard')
+@jwt_required()
+def dashboard():
+    return render_template('dashboard.html')
 
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    app.run(debug=True)
