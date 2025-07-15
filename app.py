@@ -3,7 +3,7 @@ from flask_jwt_extended import (
     JWTManager, jwt_required, create_access_token, get_jwt_identity
 )
 import os
-from auth import register_page, login_page
+from auth import register_user, login_user
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'

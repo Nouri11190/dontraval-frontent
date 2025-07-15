@@ -1,43 +1,47 @@
-from flask import Blueprint, request, jsonify, render_template
-from werkzeug.security import generate_password_hash, check_password_hash
+# auth.py
+# ---------------------------
+# Handles user registration & login
+# ---------------------------
+
+from flask import jsonify
 from flask_jwt_extended import create_access_token
-from database import db, User
+from database import get_db
 
-auth = Blueprint('auth', __name__)
 
-@auth.route('/login', methods=['GET'])
-def login_page():
-    return render_template('login.html')
+def register_user(email: str, password: str):
+    """
+    Register a new user. Returns JSON and status code:
+      201 — success
+      409 — user already exists
+    """
+    conn = get_db()
+    cur  = conn.cursor()
 
-@auth.route('/register', methods=['GET'])
-def register_page():
-    return render_template('register.html')
+    # check if email already exists
+    if cur.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
+        return jsonify({"message": "User already exists"}), 409
 
-@auth.route('/register', methods=['POST'])
-def register():
-    data = request.get_json()
-    if not data or 'email' not in data or 'password' not in data:
-        return jsonify({'message': 'Missing email or password'}), 400
+    # insert new user
+    cur.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, password))
+    conn.commit()
+    return jsonify({"message": "User registered successfully"}), 201
 
-    if User.query.filter_by(email=data['email']).first():
-        return jsonify({'message': 'User already exists'}), 409
 
-    hashed_pw = generate_password_hash(data['password'])
-    new_user = User(email=data['email'], password=hashed_pw)
-    db.session.add(new_user)
-    db.session.commit()
+def login_user(email: str, password: str):
+    """
+    Verify credentials and return a JWT token.
+      200 — success (returns {"access_token": ...})
+      401 — invalid credentials
+    """
+    conn = get_db()
+    cur  = conn.cursor()
 
-    return jsonify({'message': 'User registered'}), 201
+    row = cur.execute(
+        "SELECT * FROM users WHERE email = ? AND password = ?", (email, password)
+    ).fetchone()
 
-@auth.route('/login', methods=['POST'])
-def login():
-    data = request.get_json()
-    if not data or 'email' not in data or 'password' not in data:
-        return jsonify({'message': 'Missing email or password'}), 400
+    if not row:
+        return jsonify({"message": "Invalid credentials"}), 401
 
-    user = User.query.filter_by(email=data['email']).first()
-    if user and check_password_hash(user.password, data['password']):
-        token = create_access_token(identity=user.email)
-        return jsonify({'access_token': token}), 200
-
-    return jsonify({'message': 'Invalid credentials'}), 401
+    token = create_access_token(identity=email)
+    return jsonify({"access_token": token}), 200

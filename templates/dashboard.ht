@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head><title>Dashboard</title></head>
+<body>
+  <script>
+    if (!localStorage.getItem('token')) {
+      alert("Login required");
+      window.location.href = "/login";
+    }
+  </script>
+  <h2>Welcome to your Dashboard</h2>
+  <button onclick="logout()">Logout</button>
+  <script>
+    function logout() {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+  </script>
+</body>
+</html>
